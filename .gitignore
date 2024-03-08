@@ -1,0 +1,7 @@
+**/__pycache__
+**/.venv
+*.env
+*userlist.py
+*bwfmetaedit.exe
+*ffmpeg.exe
+*ffprobe.exe
