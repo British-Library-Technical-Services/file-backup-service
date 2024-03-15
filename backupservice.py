@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import logging
 from rich import print
 from rich.prompt import Prompt
@@ -14,10 +15,14 @@ from checksumoperations import ChecksumService
 from metadataoperations import WavHeaderRewrite
 from postoperations import PostBackupOperations
 from progressbar import progress_bar
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 logTS = datetime.now().strftime("%Y%m%d_%H.%M_log.log")
-root_location = r"/path/to/.logs"
-log = os.path.join(root_location, logTS)
+ROOT_LOCATION = os.getenv("ROOT_LOCATION")
+log = os.path.join(ROOT_LOCATION, logTS)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -35,8 +40,8 @@ root.attributes("-topmost", True)
 class BackupFileService:
     def __init__(self):
 
-        self.STAGING_LOCATION = r"/path/to/_staging_area"
-        self.ROOT_BACKUP = r"/path/to/_backup_storage"
+        self.STAGING_LOCATION = os.getenv("STAGING_LOCATION")
+        self.ROOT_BACKUP = os.getenv("ROOT_BACKUP")
 
         self.source_directory = None
         self.collection_no = None
@@ -155,8 +160,7 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
                 logger.info(f"Checksum verification passed for all files")
 
     def drive_eject_request(self):
-        while os.path.exists(self.source_directory):
-            Prompt.ask(self.ms.eject_drive)
+        print(self.ms.eject_drive)
 
         logger.info(f"{self.source_directory} ejected drive")
 
@@ -241,8 +245,9 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
         tracking_sheet = [
             f for f in self.staging_file_list if f.endswith("_TrackingSheet.xlsx")
         ]
+        tracking_sheet = tracking_sheet[0].split("/")[-1]
         self.pbo.send_tracking_spreadsheet(
-            self.engineer_name, self.batch_copy, tracking_sheet[0].split("\\")[-1]
+            self.engineer_name, self.batch_copy, tracking_sheet
         )
         logger.info(f"Tracking sheet sent for {self.engineer_name} batch")
 
@@ -274,9 +279,19 @@ bfs.drive_eject_request()
 
 ### checksums deleted, file info written, new checksums written
 bfs.post_copy_operations()
-bfs.generate_access_files()
+
+try:
+    bfs.generate_access_files()
+except Exception as e:
+    logger.warning(f"Error generating access files: {e}")
+    print(f"Error generating access files: {e}")
 
 ### move files to backup area
 bfs.move_files_to_backup()
-bfs.email_tracking_sheet()
-print("[bold magenta][u]Backup complete![/u][/bold magenta]")
+try:
+    bfs.email_tracking_sheet()
+except Exception as e:
+    logger.warning(f"Error sending tracking sheet: {e}")
+    print(f"Error sending tracking sheet: {e}")
+
+Prompt.ask("[bold magenta][u]Backup complete![/u][/bold magenta]")
