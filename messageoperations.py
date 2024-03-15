@@ -28,9 +28,9 @@ class MessagingService:
     tracking_spreadsheet_missing = "[bold][red]Warning[/red]. Tracking spreadheet missing. Please add to the directory with the files. Exiting.[/bold]"
     batch_sip_spreadsheet_missing = "[bold][red]Warning[/red]. Batch SIP spreadsheet missing. Please add to the directory with the files. Exiting.[/bold]"
     checksum_fail = "[bold][red]Warning Checksum verification failed[/red]. See log for details. Files will be removed from the staging area. Please check the files and try again. Exiting."
-    checksum_pass = "[bold][green]Checksum verification passed[/green]. File processing will begin.[/bold]\n"
+    checksum_pass = "[bold][green]Checksum verification passed[/green]. File processing will begin.[/bold]"
 
-    eject_drive = "[bold]Please eject the drive[/bold] and hit enter to continue\n"
+    eject_drive = "==| [bold]DRIVE SAFE TO EJECT[/bold] |=="
 
     copy_files_to_staging = (
         "[bold magenta]1.Copying files[/bold magenta]  to staging area..."
