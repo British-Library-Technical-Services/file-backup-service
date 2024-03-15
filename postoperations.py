@@ -5,10 +5,12 @@ import shutil
 import yagmail
 from dotenv import load_dotenv
 
+load_dotenv()
 
 class PostBackupOperations:
     def __init__(self, staging_location):
-        self.MSO_STORE = r"/path/to/_mso_audio"
+
+        self.MSO_STORE = os.getenv("MSO_STORE")
         self.collection_no = None
         self.STAGING_LOCATION = staging_location
         self.m4a_file = None
@@ -24,6 +26,7 @@ class PostBackupOperations:
             self.collection_no = parsed_name[1]
 
     def move_to_mso_store(self):
+
         collection_directory = os.path.join(self.MSO_STORE, self.collection_no)
         if not os.path.exists(collection_directory):
             os.mkdir(collection_directory)
@@ -55,14 +58,13 @@ class PostBackupOperations:
         self.move_to_mso_store()
 
     def send_tracking_spreadsheet(self, engineer_name, batch_location, tracking_sheet):
-        load_dotenv()
         sender_email = os.getenv("SENDER_EMAIL")
         sender_password = os.getenv("SENDER_PASSWORD")
-        recepieint_email = os.getenv("RECEPIENT_EMAIL")
+        recipient_email = os.getenv("RECIPIENT_EMAIL")
 
         yag = yagmail.SMTP(sender_email, sender_password)
         yag.send(
-            to=recepieint_email,
+            to=recipient_email,
             subject=f"Engineer: {engineer_name}, Tracking Sheet: {tracking_sheet})",
             contents=f"Tracking Spreadhsheet located in {batch_location}",
             attachments=os.path.join(batch_location, tracking_sheet),
