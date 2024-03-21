@@ -1,5 +1,5 @@
 import os
-
+from rich import print
 
 class MessagingService:
 
@@ -12,25 +12,27 @@ class MessagingService:
     2. The directory is in the root of the drive with no subdirectories
     3. The directory is named with your name (first and surname)
     4. All the audio files have .md5 checksums
-    5. The directory contains your batch SIP and tracking spreadsheets:
+    5. The directory contains your batch SIP and tracking spreadsheets, [bold]named in the following format[/bold]:
 
-        * Engineer_Date_BatchNo_ExcelBatchUpload.xlsx
-        * Engineer_Date_BatchNo_TrackingSheet.xlsx
+    ---------------------------------------------------------------------------------------------------
+    | EnigneerName_Date_BatchNo_TrackingSpreadsheet  | CarloKrahmer_240307_1_TrackingSpreadheet.xlsx  |
+    | EnigneerName_Date_BatchNo_ExcelBatchUpload     | CarloKrahmer_240307_1_ExcelBatchUpload.xlsx    |
+    ---------------------------------------------------------------------------------------------------
 
     6. The metadata for the all files in the directory is in the above spreadsheets\n"""
 
-    confirm_checks = "Once the checks have been completed, [bold]please attach your drive and hit enter to continue[/bold]\n"
+    confirm_checks = "Once the checks have been completed, [bold]please attach your drive and hit enter to continue[/bold]"
     user_cancel = (
         "[bold][red]Warning[/red]. User cancelled the operation. Exiting.[/bold]"
     )
-    empty_directory = "[bold][red]Warning[/red]. No directories found. Exiting.[/bold]"
-    no_engineer_match = "[bold][red]Warning[/red]. Directory name does not match any engineer name in the list.  Please check the directory name matches[/bold]"
+    empty_directory = "[bold][red]Warning[/red]. No directories found. Exiting[/bold]"
+    no_engineer_match = "[bold][red]Warning[/red]. Directory name does not match any engineer name in the list.  Please check the directory name matches. Existing[/bold]"
     tracking_spreadsheet_missing = "[bold][red]Warning[/red]. Tracking spreadheet missing. Please add to the directory with the files. Exiting.[/bold]"
     batch_sip_spreadsheet_missing = "[bold][red]Warning[/red]. Batch SIP spreadsheet missing. Please add to the directory with the files. Exiting.[/bold]"
     checksum_fail = "[bold][red]Warning Checksum verification failed[/red]. See log for details. Files will be removed from the staging area. Please check the files and try again. Exiting."
     checksum_pass = "[bold][green]Checksum verification passed[/green]. File processing will begin.[/bold]"
 
-    eject_drive = "==| [bold]DRIVE SAFE TO EJECT[/bold] |=="
+    eject_drive = "\n==| [bold]YOUR DRIVE IS SAFE TO EJECT[/bold] |==\n"
 
     copy_files_to_staging = (
         "[bold magenta]1.Copying files[/bold magenta]  to staging area..."
@@ -44,6 +46,7 @@ class MessagingService:
     )
 
     def engineer_file_data(self, engineer, file_list):
+        # file_list = [file for file in file_list if not file.endswith('.md5')]
         os.system("cls||clear")
         return f"""
 Hello [bold magenta]{engineer}![/bold magenta] {len(file_list)} files will be backed-up today.
