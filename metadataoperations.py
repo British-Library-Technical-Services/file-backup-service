@@ -37,7 +37,7 @@ class WavHeaderRewrite:
         ):
             isft = self.results["encoded_by"]
             icrd = f"{self.results['date']}T{self.results['creation_time'].replace('-', ':')}Z"
-            subprocess.call(
+            subprocess.run(
                 [
                     "bwfmetaedit",
                     wav_file,
@@ -49,7 +49,8 @@ class WavHeaderRewrite:
                     "--ICRD=" + icrd,
                     "--IENG=" + engineer_name,
                     "--ISFT=" + isft,
-                ]
+                ],
+                stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL # mute subprocess output
             )
         else:
             pass
