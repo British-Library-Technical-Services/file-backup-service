@@ -2,6 +2,7 @@
 **/.venv
 *.env
 *userlist.py
+*test_pad.py
 *bwfmetaedit.exe
 *ffmpeg.exe
 *ffprobe.exe
