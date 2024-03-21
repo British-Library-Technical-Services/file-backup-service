@@ -25,19 +25,19 @@ class PostBackupOperations:
         else:
             self.collection_no = parsed_name[1]
 
-    def move_to_mso_store(self):
+    def move_to_mso_store(self, m4a_file):
 
         collection_directory = os.path.join(self.MSO_STORE, self.collection_no)
         if not os.path.exists(collection_directory):
             os.mkdir(collection_directory)
-            shutil.move(self.m4a_file, collection_directory)
+            shutil.move(m4a_file, collection_directory)
         else:
-            if os.path.exists(os.path.join(collection_directory, self.m4a_file)):
-                os.remove(os.path.join(self.STAGING_LOCATION, self.m4a_file))
+            if os.path.exists(os.path.join(collection_directory, m4a_file)):
+                os.remove(os.path.join(self.STAGING_LOCATION, m4a_file))
 
     def access_file_generate(self, wav_file):
         wav_file_name = os.path.basename(wav_file.split(".")[0])
-        self.m4a_file = os.path.join(self.STAGING_LOCATION, f"{wav_file_name}.m4a")
+        m4a_file = os.path.join(self.STAGING_LOCATION, f"{wav_file_name}.m4a")
         subprocess.call(
             [
                 "ffmpeg",
@@ -52,10 +52,10 @@ class PostBackupOperations:
                 "-b:a",
                 "256k",
                 "-vn",
-                self.m4a_file,
-            ]
+                m4a_file,
+            ],
         )
-        self.move_to_mso_store()
+        self.move_to_mso_store(m4a_file)
 
     def send_tracking_spreadsheet(self, engineer_name, batch_location, tracking_sheet):
         sender_email = os.getenv("SENDER_EMAIL")
@@ -64,8 +64,8 @@ class PostBackupOperations:
 
         yag = yagmail.SMTP(sender_email, sender_password)
         yag.send(
-            to=recipient_email,
-            subject=f"Engineer: {engineer_name}, Tracking Sheet: {tracking_sheet})",
-            contents=f"Tracking Spreadhsheet located in {batch_location}",
-            attachments=os.path.join(batch_location, tracking_sheet),
+            to = recipient_email,
+            subject = f"Engineer: {engineer_name}, Tracking Sheet: {tracking_sheet})",
+            contents = f"Tracking Spreadhsheet located in {batch_location}",
+            attachments = os.path.join(batch_location, tracking_sheet),
         )
