@@ -60,7 +60,7 @@ class BackupFileService:
             logger.warning(f"Files found in staging area")
             for file in staging_file_check:
                 os.remove(file)
-            logger.warning(f"{file} removed from staging area")
+                logger.warning(f"{file} removed from staging area")
         else:
             logger.info(f"staging area clear")
 
@@ -105,20 +105,24 @@ class BackupFileService:
         logger.info(f"copy_files_to_staging started for {self.engineer_name}")
 
         file_list = glob.glob(self.source_directory + "/*.*")
+
         if not any("_TrackingSheet.xlsx" in file for file in file_list):
-            logger.warning(f"Tracking spreadsheet missing. Exiting.")
+            logger.critical(f"Tracking spreadsheet missing. Exiting.")
             raise ValueError(self.ms.tracking_spreadsheet_missing)
 
         elif not any("_ExcelBatchUpload.xlsx" in file for file in file_list):
-            logger.warning(f"Batch SIP spreadsheet missing. Exiting.")
+            logger.critical(f"Batch SIP spreadsheet missing. Exiting.")
             raise ValueError(self.ms.batch_sip_spreadsheet_missing)
         else:
+            for file in file_list:
+                logger.info(f"{file} will be copied to staging area")
+
             Prompt.ask(self.ms.engineer_file_data(self.engineer_name, file_list))
 
             print(self.ms.copy_files_to_staging)
 
-            for file in file_list:
-                self.progress_bar(file_list.index(file), len(file_list))
+            for index, file in enumerate(file_list):
+                self.progress_bar(index, len(file_list))
                 staging_file_copy = os.path.join(
                     self.STAGING_LOCATION, os.path.basename(file)
                 )
@@ -174,9 +178,9 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
 
         self.staging_file_list = glob.glob(self.STAGING_LOCATION + "/*.*")
 
-        for file in self.staging_file_list:
+        for index, file in enumerate(self.staging_file_list):
             self.progress_bar(
-                self.staging_file_list.index(file), len(self.staging_file_list)
+                index, len(self.staging_file_list)
             )
             if file.endswith(".wav"):
                 wav_file = file
@@ -194,8 +198,8 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
         logger.info(f"generate_access_files started for {self.engineer_name}")
 
         print(self.ms.generate_access_files)
-        for file in self.staging_file_list:
-            self.progress_bar(file.index(file), len(self.staging_file_list))
+        for index, file in enumerate(self.staging_file_list):
+            self.progress_bar(index, len(self.staging_file_list))
             if file.endswith(".wav"):
                 wav_file = file
                 self.pbo.get_shelfmark(wav_file)
@@ -229,9 +233,9 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
         os.mkdir(self.batch_copy)
         logger.info(f"New batch directory created at {self.batch_copy}")
 
-        for staged_file in self.staging_file_list:
+        for index, staged_file in enumerate(self.staging_file_list):
             self.progress_bar(
-                self.staging_file_list.index(staged_file), len(self.staging_file_list)
+                index, len(self.staging_file_list)
             )
             shutil.move(staged_file, self.batch_copy)
             logger.info(f"{staged_file} moved to {self.batch_copy}")
@@ -263,14 +267,14 @@ bfs.clear_staging_area()
 try:
     bfs.set_source_and_engineer()
 except ValueError as e:
-    print(e)
+    print(str(e))
     exit()
 
 ### copy files to staging area
 try:
     bfs.copy_files_to_staging()
 except ValueError as e:
-    print(e)
+    print(str(e))
     bfs.clear_staging_area()
     exit()
 
@@ -286,7 +290,7 @@ except Exception as e:
     logger.warning(f"Error generating access files: {e}")
     print(f"Error generating access files: {e}")
 
-### move files to backup area
+## move files to backup area
 bfs.move_files_to_backup()
 try:
     bfs.email_tracking_sheet()
