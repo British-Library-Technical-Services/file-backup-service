@@ -6,7 +6,7 @@ import glob
 class ChecksumService:
     def __init__(self):
         self.file_checksum = None
-        self.verfied_status = False
+        self.verified_status = False
         self.failed_files = []
 
     def file_checksum_generate(self, file):
@@ -28,9 +28,9 @@ class ChecksumService:
         with open(md5_file_name, "r") as md5_file:
             md5_string = md5_file.read(32)
             if self.file_checksum == md5_string:
-                self.verfied_status = True
+                self.verified_status = True
             else:
-                self.verfied_status = False
+                self.verified_status = False
                 self.failed_files.append(os.path.basename(file))
 
     def delete_exisiting_checksums(self, location):
