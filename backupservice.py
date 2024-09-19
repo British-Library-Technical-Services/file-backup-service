@@ -1,7 +1,4 @@
-from dotenv import load_dotenv
 import logging
-from rich import print
-from rich.prompt import Prompt
 import os
 import tkinter as tk
 from tkinter import filedialog
@@ -9,28 +6,21 @@ from datetime import datetime
 import glob
 import shutil
 
+from dotenv import load_dotenv
+from rich import print
+from rich.prompt import Prompt
+
+
 from messageoperations import MessagingService
 import userlist
 from checksumoperations import ChecksumService
 from metadataoperations import WavHeaderRewrite
 from postoperations import PostBackupOperations
-from progressbar import progress_bar
-from dotenv import load_dotenv
-import os
+from drivemirroroperations import DriveMirror
+from progressbar import progress_bar, cycling_progress
+from logging_module import logger
 
 load_dotenv()
-
-logTS = datetime.now().strftime("%Y%m%d_%H.%M_log.log")
-ROOT_LOCATION = os.getenv("ROOT_LOCATION")
-log = os.path.join(ROOT_LOCATION, logTS)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s:%(module)s:%(levelname)s:%(message)s")
-file_handler = logging.FileHandler(log)
-
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
 
 root = tk.Tk()
 root.withdraw()
@@ -42,17 +32,22 @@ class BackupFileService:
 
         self.STAGING_LOCATION = os.getenv("STAGING_LOCATION")
         self.ROOT_BACKUP = os.getenv("ROOT_BACKUP")
+        self.BAU_ENGINEER_1 = os.getenv("BAU_ENGINEER_1")
+        self.BAU_ENGINEER_2 = os.getenv("BAU_ENGINEER_2")
 
         self.source_directory = None
         self.collection_no = None
         self.engineer_name = None
-        self.fco = ChecksumService()
-        self.whr = WavHeaderRewrite()
-        self.pbo = PostBackupOperations(self.STAGING_LOCATION)
-        self.progress_bar = progress_bar
+
         self.staging_file_list = None
         self.batch_copy = None
+        self.mirror_in_progress = False
+
+        self.cs = ChecksumService()
+        self.whr = WavHeaderRewrite()
         self.ms = MessagingService()
+        self.pbo = PostBackupOperations(self.STAGING_LOCATION)
+        self.progress_bar = progress_bar
 
     def clear_staging_area(self):
         staging_file_check = glob.glob(self.STAGING_LOCATION + "/*.*")
@@ -66,10 +61,9 @@ class BackupFileService:
 
     def set_source_and_engineer(self):
 
-        print(self.ms.welcome_message)
-        Prompt.ask(self.ms.confirm_checks)
+        Prompt.ask(self.ms.welcome_messgage)
 
-        source_drive_select = filedialog.askdirectory()
+        source_drive_select = filedialog.askdirectory(initialdir="/media/quadriga/")
         if source_drive_select == "":
             logger.warning(f"User cancelled source directory selection. Exiting.")
             raise ValueError(self.ms.user_cancel)
@@ -100,24 +94,36 @@ class BackupFileService:
             if self.engineer_name is None:
                 logger.warning(f"No directory matches engineer name in list. Exiting.")
                 raise ValueError(self.ms.no_engineer_match)
+            else:
+                return self.engineer_name
 
     def copy_files_to_staging(self):
         logger.info(f"copy_files_to_staging started for {self.engineer_name}")
 
         file_list = glob.glob(self.source_directory + "/*.*")
 
-        if not any("_TrackingSheet.xlsx" in file for file in file_list):
-            logger.critical(f"Tracking spreadsheet missing. Exiting.")
-            raise ValueError(self.ms.tracking_spreadsheet_missing)
+        if file_list == []:
+            logger.critical(f"No files found in source directory. Exiting.")
+            raise ValueError(self.ms.no_files_found)
 
-        elif not any("_ExcelBatchUpload.xlsx" in file for file in file_list):
+        if not any("_ExcelBatchUpload.xlsx" in file for file in file_list):
             logger.critical(f"Batch SIP spreadsheet missing. Exiting.")
             raise ValueError(self.ms.batch_sip_spreadsheet_missing)
+        
         else:
+            # exclude_md5_file_list = [f for f in file_list if not f.endswith(".md5")]
+
             for file in file_list:
                 logger.info(f"{file} will be copied to staging area")
 
-            Prompt.ask(self.ms.engineer_file_data(self.engineer_name, file_list))
+            while True:  # start backup service and view criteria option
+                response = Prompt.ask(
+                    self.ms.engineer_file_data(self.engineer_name, file_list)
+                )
+                if response == "v":
+                    Prompt.ask(self.ms.collection_backup_message)
+                else:
+                    break
 
             print(self.ms.copy_files_to_staging)
 
@@ -132,10 +138,10 @@ class BackupFileService:
                     md5_file_name = f"{file}.md5"
 
                     if os.path.exists(md5_file_name):
-                        self.fco.file_checksum_generate(file)
+                        self.cs.file_checksum_generate(file)
                     else:
-                        self.fco.file_checksum_generate(file)
-                        self.fco.write_checksum_to_file(file, md5_file_name)
+                        self.cs.file_checksum_generate(file)
+                        self.cs.write_checksum_to_file(file, md5_file_name)
                         logger.info(f"Generated checksum for {file}")
 
                     shutil.copy2(file, staging_file_copy)
@@ -144,20 +150,20 @@ class BackupFileService:
                     shutil.copy2(md5_file_name, f"{staging_file_copy}.md5")
                     logger.info(f"{md5_file_name} copied to staging area")
 
-                    self.fco.file_checksum_verify(staging_file_copy)
+                    self.cs.file_checksum_verify(staging_file_copy)
                     logger.info(f"Checksum verification check for {staging_file_copy}")
                 else:
                     shutil.copy2(file, staging_file_copy)
                     logger.info(f"{file} copied to staging area")
 
-            if self.fco.failed_files != []:
+            if self.cs.failed_files != []:
                 logger.critical(
-                    f"Checksum verification failed for {self.fco.failed_files}"
+                    f"Checksum verification failed for {self.cs.failed_files}"
                 )
                 raise ValueError(
                     f"""
 {self.ms.checksum_fail}
-Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
+Failed Files: {len(self.cs.failed_files)}; {self.cs.failed_files}"""
                 )
             else:
                 print(self.ms.checksum_pass)
@@ -173,15 +179,13 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
 
         print(self.ms.post_copy_operations)
 
-        self.fco.delete_exisiting_checksums(self.STAGING_LOCATION)
+        self.cs.delete_exisiting_checksums(self.STAGING_LOCATION)
         logger.info(f"Deleted existing checksums in {self.STAGING_LOCATION}")
 
         self.staging_file_list = glob.glob(self.STAGING_LOCATION + "/*.*")
 
         for index, file in enumerate(self.staging_file_list):
-            self.progress_bar(
-                index, len(self.staging_file_list)
-            )
+            self.progress_bar(index, len(self.staging_file_list))
             if file.endswith(".wav"):
                 wav_file = file
                 self.whr.file_bext_export(wav_file)
@@ -190,8 +194,8 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
                 self.whr.file_info_import(wav_file, self.engineer_name)
                 logger.info(f"self.whr.file_info_import completed for ({wav_file})")
 
-                self.fco.file_checksum_generate(wav_file)
-                self.fco.write_checksum_to_file(wav_file, f"{wav_file}.md5")
+                self.cs.file_checksum_generate(wav_file)
+                self.cs.write_checksum_to_file(wav_file, f"{wav_file}.md5")
                 logger.info(f"New checksum generated for ({wav_file})")
 
     def generate_access_files(self):
@@ -213,6 +217,7 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
 
         print(self.ms.move_files_to_backup)
         copy_location = os.path.join(self.ROOT_BACKUP, self.engineer_name)
+
         if os.path.exists(copy_location):
             logger.info(f"Directory exists at {copy_location}")
             pass
@@ -234,26 +239,13 @@ Failed Files: {len(self.fco.failed_files)}; {self.fco.failed_files}"""
         logger.info(f"New batch directory created at {self.batch_copy}")
 
         for index, staged_file in enumerate(self.staging_file_list):
-            self.progress_bar(
-                index, len(self.staging_file_list)
-            )
+            self.progress_bar(index, len(self.staging_file_list))
             shutil.move(staged_file, self.batch_copy)
             logger.info(f"{staged_file} moved to {self.batch_copy}")
             if os.path.exists(f"{staged_file}.md5"):
                 shutil.move(f"{staged_file}.md5", self.batch_copy)
             else:
                 pass
-
-    def email_tracking_sheet(self):
-        logger.info(f"email_tracking_sheet started for {self.engineer_name}")
-        tracking_sheet = [
-            f for f in self.staging_file_list if f.endswith("_TrackingSheet.xlsx")
-        ]
-        tracking_sheet = tracking_sheet[0].split("/")[-1]
-        self.pbo.send_tracking_spreadsheet(
-            self.engineer_name, self.batch_copy, tracking_sheet
-        )
-        logger.info(f"Tracking sheet sent for {self.engineer_name} batch")
 
 
 ### start backup service
@@ -267,35 +259,44 @@ bfs.clear_staging_area()
 try:
     bfs.set_source_and_engineer()
 except ValueError as e:
-    print(str(e))
+    Prompt.ask(str(e))
     exit()
 
-### copy files to staging area
-try:
-    bfs.copy_files_to_staging()
-except ValueError as e:
-    print(str(e))
-    bfs.clear_staging_area()
-    exit()
+if bfs.engineer_name == bfs.BAU_ENGINEER_1 or bfs.engineer_name == bfs.BAU_ENGINEER_2:
+    try:
+        dmo = DriveMirror(bfs.source_directory, bfs.ROOT_BACKUP, bfs.engineer_name)
+        dmo.run_drive_mirror_operations()  # move operations to drive mirror service
+    except Exception as e:
+        logger.warning(f"Error mirroring drive: {e}")
+        print(f"Error mirroring drive: {e}")
+        exit()
 
-### eject drive
-bfs.drive_eject_request()
+    Prompt.ask(
+        "\n[bold magenta][u]Drive mirror complete![/u][/bold magenta]. [bold]Please eject the drive[/bold]"
+    )
 
-### checksums deleted, file info written, new checksums written
-bfs.post_copy_operations()
+else:
+    ### copy files to staging area
+    try:
+        bfs.copy_files_to_staging()
+    except ValueError as e:
+        Prompt.ask(str(e))
+        bfs.clear_staging_area()
+        exit()
 
-try:
-    bfs.generate_access_files()
-except Exception as e:
-    logger.warning(f"Error generating access files: {e}")
-    print(f"Error generating access files: {e}")
+    ### eject drive
+    bfs.drive_eject_request()
 
-## move files to backup area
-bfs.move_files_to_backup()
-try:
-    bfs.email_tracking_sheet()
-except Exception as e:
-    logger.warning(f"Error sending tracking sheet: {e}")
-    print(f"Error sending tracking sheet: {e}")
+    ### checksums deleted, file info written, new checksums written
+    bfs.post_copy_operations()
 
-Prompt.ask("[bold magenta][u]Backup complete![/u][/bold magenta]")
+    try:
+        bfs.generate_access_files()
+    except Exception as e:
+        logger.warning(f"Error generating access files: {e}")
+        print(f"Error generating access files: {e}")
+
+    ## move files to backup area
+    bfs.move_files_to_backup()
+
+    Prompt.ask("[bold magenta][u]Backup complete![/u][/bold magenta]")
