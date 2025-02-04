@@ -1,4 +1,3 @@
-import logging
 import os
 import tkinter as tk
 from tkinter import filedialog
@@ -50,23 +49,39 @@ class BackupFileService:
         self.progress_bar = progress_bar
 
     def clear_staging_area(self):
-        staging_file_check = glob.glob(self.STAGING_LOCATION + "/*.*")
+        try:
+            staging_file_check = glob.glob(self.STAGING_LOCATION + "/*.*")
+        except FileNotFoundError:
+            logger.critical(f"Staging area not found. Exiting.")
+            raise ValueError(FileNotFoundError)
+
         if staging_file_check != []:
             logger.warning(f"Files found in staging area")
             for file in staging_file_check:
-                os.remove(file)
-                logger.warning(f"{file} removed from staging area")
+                try:    
+                    os.remove(file)
+                    logger.warning(f"{file} removed from staging area")
+                except Exception as e:
+                    logger.warning(f"Error removing file: {e}")
+                    raise ValueError(f"Error removing file: {e}")
         else:
             logger.info(f"staging area clear")
+        
 
     def set_source_and_engineer(self):
 
         Prompt.ask(self.ms.welcome_messgage)
 
-        source_drive_select = filedialog.askdirectory(initialdir="/media/quadriga/")
+        try:
+            source_drive_select = filedialog.askdirectory(initialdir="/media/quadriga/")
+        except FileNotFoundError:
+            logger.warning(f"Source directory not found. Exiting.")
+            raise ValueError(FileNotFoundError)
+
         if source_drive_select == "":
             logger.warning(f"User cancelled source directory selection. Exiting.")
             raise ValueError(self.ms.user_cancel)
+
         else:
             source_dir_list = [
                 dir
@@ -97,17 +112,22 @@ class BackupFileService:
             else:
                 return self.engineer_name
 
+
     def copy_files_to_staging(self):
         logger.info(f"copy_files_to_staging started for {self.engineer_name}")
 
-        file_list = glob.glob(self.source_directory + "/*.*")
+        try:
+            file_list = glob.glob(self.source_directory + "/*.*")
+        except FileNotFoundError:
+            logger.critical(f"Source directory not found. Exiting.")
+            raise ValueError(FileNotFoundError)
 
         if file_list == []:
-            logger.critical(f"No files found in source directory. Exiting.")
+            logger.warning(f"No files found in source directory. Exiting.")
             raise ValueError(self.ms.no_files_found)
 
         if not any("_ExcelBatchUpload.xlsx" in file for file in file_list):
-            logger.critical(f"Batch SIP spreadsheet missing. Exiting.")
+            logger.warning(f"Batch SIP spreadsheet missing. Exiting.")
             raise ValueError(self.ms.batch_sip_spreadsheet_missing)
         
         else:
@@ -136,7 +156,7 @@ class BackupFileService:
                     pass
                 elif file.endswith(".wav"):
                     md5_file_name = f"{file}.md5"
-
+                    
                     if os.path.exists(md5_file_name):
                         self.cs.file_checksum_generate(file)
                     else:
@@ -144,17 +164,29 @@ class BackupFileService:
                         self.cs.write_checksum_to_file(file, md5_file_name)
                         logger.info(f"Generated checksum for {file}")
 
-                    shutil.copy2(file, staging_file_copy)
-                    logger.info(f"{file} copied to staging area")
-
-                    shutil.copy2(md5_file_name, f"{staging_file_copy}.md5")
-                    logger.info(f"{md5_file_name} copied to staging area")
+                    try:
+                        shutil.copy2(file, staging_file_copy)
+                        logger.info(f"{file} copied to staging area")
+                    except Exception as e:
+                        logger.warning(f"Error copying file: {e}")
+                        raise ValueError(f"Error copying file: {e}")
+                    
+                    try:
+                        shutil.copy2(md5_file_name, f"{staging_file_copy}.md5")
+                        logger.info(f"{md5_file_name} copied to staging area")
+                    except Exception as e:
+                        logger.warning(f"Error copying file: {e}")
+                        raise ValueError(f"Error copying file: {e}")
 
                     self.cs.file_checksum_verify(staging_file_copy)
                     logger.info(f"Checksum verification check for {staging_file_copy}")
+                
                 else:
-                    shutil.copy2(file, staging_file_copy)
-                    logger.info(f"{file} copied to staging area")
+                    try:
+                        shutil.copy2(file, staging_file_copy)
+                        logger.info(f"{file} copied to staging area")
+                    except Exception as e:
+                        logger.warning(f"Error copying file: {e}")
 
             if self.cs.failed_files != []:
                 logger.critical(
@@ -182,7 +214,11 @@ Failed Files: {len(self.cs.failed_files)}; {self.cs.failed_files}"""
         self.cs.delete_exisiting_checksums(self.STAGING_LOCATION)
         logger.info(f"Deleted existing checksums in {self.STAGING_LOCATION}")
 
-        self.staging_file_list = glob.glob(self.STAGING_LOCATION + "/*.*")
+        try:
+            self.staging_file_list = glob.glob(self.STAGING_LOCATION + "/*.*")
+        except FileNotFoundError:
+            logger.critical(f"Staging area not found. Exiting.")
+            raise ValueError(FileNotFoundError)
 
         for index, file in enumerate(self.staging_file_list):
             self.progress_bar(index, len(self.staging_file_list))
@@ -218,16 +254,25 @@ Failed Files: {len(self.cs.failed_files)}; {self.cs.failed_files}"""
         print(self.ms.move_files_to_backup)
         copy_location = os.path.join(self.ROOT_BACKUP, self.engineer_name)
 
-        if os.path.exists(copy_location):
-            logger.info(f"Directory exists at {copy_location}")
-            pass
-        else:
-            os.mkdir(copy_location)
-            logger.info(f"New directory created at {copy_location}")
+        try:
+            if os.path.exists(copy_location):
+                logger.info(f"Directory exists at {copy_location}")
+                pass
+            else:
+                os.mkdir(copy_location)
+                logger.info(f"New directory created at {copy_location}")
+        except Exception as e:
+            logger.critical(f"Error creating directory: {e}")
+            raise ValueError(f"Error creating directory: {e}")
 
         get_datetime = datetime.now().strftime("%Y%m%d_%H.%M")
-        existing_batch_dir = os.listdir(copy_location)
 
+        try:
+            existing_batch_dir = os.listdir(copy_location)
+        except FileNotFoundError:
+            logger.critical(f"Backup directory not found")
+            raise ValueError(FileNotFoundError)
+        
         if existing_batch_dir != []:
             number = len(existing_batch_dir) + 1
             batch_dir_number = f"batch_{number:02}_{get_datetime}"
@@ -235,68 +280,96 @@ Failed Files: {len(self.cs.failed_files)}; {self.cs.failed_files}"""
             batch_dir_number = f"batch_01_{get_datetime}"
 
         self.batch_copy = os.path.join(copy_location, batch_dir_number)
-        os.mkdir(self.batch_copy)
-        logger.info(f"New batch directory created at {self.batch_copy}")
+
+        try:
+            os.mkdir(self.batch_copy)
+            logger.info(f"New batch directory created at {self.batch_copy}")
+        except Exception as e:
+            logger.critical(f"Error creating batch directory: {e}")
+            raise ValueError(f"Error creating batch directory: {e}")
 
         for index, staged_file in enumerate(self.staging_file_list):
             self.progress_bar(index, len(self.staging_file_list))
-            shutil.move(staged_file, self.batch_copy)
-            logger.info(f"{staged_file} moved to {self.batch_copy}")
-            if os.path.exists(f"{staged_file}.md5"):
-                shutil.move(f"{staged_file}.md5", self.batch_copy)
-            else:
-                pass
+            try:
+                shutil.move(staged_file, self.batch_copy)
+                logger.info(f"{staged_file} moved to {self.batch_copy}")
+                if os.path.exists(f"{staged_file}.md5"):
+                    shutil.move(f"{staged_file}.md5", self.batch_copy)
+                else:
+                    pass
+            except Exception as e:
+                logger.critical(f"Error moving file: {e}")
+                raise ValueError(f"Error moving file: {e}")
 
-
+def main():
 ### start backup service
-bfs = BackupFileService()
-logger.info("Backup service started")
-
-### clear staging area
-bfs.clear_staging_area()
-
-### source copy set and engineer name captured
-try:
-    bfs.set_source_and_engineer()
-except ValueError as e:
-    Prompt.ask(str(e))
-    exit()
-
-if bfs.engineer_name == bfs.BAU_ENGINEER_1 or bfs.engineer_name == bfs.BAU_ENGINEER_2:
     try:
-        dmo = DriveMirror(bfs.source_directory, bfs.ROOT_BACKUP, bfs.engineer_name)
-        dmo.run_drive_mirror_operations()  # move operations to drive mirror service
+        bfs = BackupFileService()
+        logger.info("Backup service started")
     except Exception as e:
-        logger.warning(f"Error mirroring drive: {e}")
-        print(f"Error mirroring drive: {e}")
-        exit()
-
-    Prompt.ask(
-        "\n[bold magenta][u]Drive mirror complete![/u][/bold magenta]. [bold]Please eject the drive[/bold]"
-    )
-
-else:
-    ### copy files to staging area
-    try:
-        bfs.copy_files_to_staging()
-    except ValueError as e:
         Prompt.ask(str(e))
-        bfs.clear_staging_area()
         exit()
 
-    ### eject drive
-    bfs.drive_eject_request()
-
-    ### checksums deleted, file info written, new checksums written
-    bfs.post_copy_operations()
-
+    ### clear staging area
     try:
-        bfs.generate_access_files()
+        bfs.clear_staging_area()
     except Exception as e:
-        logger.warning(f"Error generating access files: {e}")
-        print(f"Error generating access files: {e}")
+        Prompt.ask(str(e))
+        exit()
 
-    ## move files to backup area
-    bfs.move_files_to_backup()
+    ### source copy set and engineer name captured
+    try:
+        bfs.set_source_and_engineer()
+    except Exception as e:
+        Prompt.ask(str(e))
+        exit()
 
-    Prompt.ask("[bold magenta][u]Backup complete![/u][/bold magenta]")
+    if bfs.engineer_name == bfs.BAU_ENGINEER_1 or bfs.engineer_name == bfs.BAU_ENGINEER_2:
+        try:
+            dmo = DriveMirror(bfs.source_directory, bfs.ROOT_BACKUP, bfs.engineer_name)
+            dmo.run_drive_mirror_operations()  # move operations to drive mirror service
+        except Exception as e:
+            logger.warning(f"Error mirroring drive: {e}")
+            print(f"Error mirroring drive: {e}")
+            exit()
+
+        Prompt.ask(
+            "\n[bold magenta][u]Drive mirror complete![/u][/bold magenta]. [bold]Please eject the drive[/bold]"
+        )
+
+    else:
+        ### copy files to staging area
+        try:
+            bfs.copy_files_to_staging()
+        except ValueError as e:
+            Prompt.ask(str(e))
+            bfs.clear_staging_area()
+            exit()
+
+        ### eject drive
+        bfs.drive_eject_request()
+
+        ### checksums deleted, file info written, new checksums written
+        try:
+            bfs.post_copy_operations()
+        except Exception as e:
+            Prompt.ask(str(e))
+            exit()
+
+        try:
+            bfs.generate_access_files()
+        except Exception as e:
+            logger.warning(f"Error generating access files: {e}")
+            print(f"Error generating access files: {e}")
+
+        ## move files to backup area
+        try:
+            bfs.move_files_to_backup()
+        except Exception as e:
+            Prompt.ask(str(e))
+            exit()
+
+        Prompt.ask("[bold magenta][u]Backup complete![/u][/bold magenta]")
+
+if __name__ == "__main__":
+    main()
