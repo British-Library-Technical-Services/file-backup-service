@@ -31,8 +31,8 @@ class BackupFileService:
 
         self.STAGING_LOCATION = os.getenv("STAGING_LOCATION")
         self.ROOT_BACKUP = os.getenv("ROOT_BACKUP")
-        self.BAU_ENGINEER_1 = os.getenv("BAU_ENGINEER_1")
-        self.BAU_ENGINEER_2 = os.getenv("BAU_ENGINEER_2")
+        self.BAU_ENGINEER_1 = os.getenv("BAU_ENGINEER_1") # drive mirror operations for BAU engineer
+        self.BAU_ENGINEER_2 = os.getenv("BAU_ENGINEER_2") # drive mirror operations for BAU engineer's second drive
 
         self.source_directory = None
         self.collection_no = None
