@@ -1,3 +1,10 @@
+"""Drive mirroring operations.
+
+Determines differences between a source engineer drive and its mirror, then
+applies incremental updates (new / changed / removed files) while optionally
+validating associated checksum sidecar files (.md5) when present.
+"""
+
 import os
 import glob
 import shutil
@@ -17,8 +24,31 @@ load_dotenv()
 
 
 class DriveMirror:
-    def __init__(self, source_drive, drive_mirror, engineer_name):
+    """Incrementally mirror a source drive into a destination engineer folder.
 
+    Attributes:
+        source_drive (str): Root path of the engineer's source drive.
+        DRIVE_MIRROR (str): Root path where engineer mirrors are stored.
+        engineer_name (str): Engineer folder name under DRIVE_MIRROR.
+        mirrored_file (str|None): Path of the most recently copied file.
+        source_file_paths (list[tuple[str,int]]): Relative paths + sizes in source.
+        mirror_file_paths (list[tuple[str,int]]): Relative paths + sizes in mirror.
+        new_files_in_source (list[tuple[str,int]]): Files present only in source.
+        changed_files_in_source (list[tuple[str,int]]): Same path but different size.
+        removed_files_in_source (list[tuple[str,int]]): Files no longer in source.
+        cs (ChecksumService): Checksum service instance for validation.
+        ms (MessagingService): Messaging/UX helper for prompts.
+        progress_bar (callable): Progress bar function for CLI feedback.
+    """
+
+    def __init__(self, source_drive, drive_mirror, engineer_name):
+        """Initialize a new DriveMirror instance.
+
+        Args:
+            source_drive (str): Source drive root path.
+            drive_mirror (str): Destination root path for mirrors.
+            engineer_name (str): Engineer identifier / folder name.
+        """
         self.source_drive = source_drive
         self.DRIVE_MIRROR = drive_mirror
         self.engineer_name = engineer_name
@@ -33,6 +63,7 @@ class DriveMirror:
         self.progress_bar = progress_bar
 
     def check_mirror_location(self):
+        """Return True if engineer mirror folder exists, else False."""
         if not os.path.exists(os.path.join(self.DRIVE_MIRROR, self.engineer_name)):
             logger.info("Mirror location does not exist")
             return False
@@ -41,6 +72,7 @@ class DriveMirror:
             return True
 
     def mirror_change_breakdown(self):
+        """Print a summary of new, changed, and removed files pending commit."""
         print(f"\n[bold]New Files: {len(self.new_files_in_source)}[/bold]")
         for new_file in self.new_files_in_source:
             print(f" * {new_file[0]}")
@@ -54,6 +86,11 @@ class DriveMirror:
             print(f" * {removed_file[0]}")
 
     def check_source_mirror_changes(self):
+        """Populate diff lists (new/changed/removed) between source and mirror.
+
+        Returns:
+            bool: True if any differences are detected, False otherwise.
+        """
         full_source_list = glob.glob(
             os.path.join(self.source_drive, "**/*.*"),
             recursive=True,
@@ -111,6 +148,7 @@ class DriveMirror:
             return False
 
     def new_file_operations(self, new_file):
+        """Mirror a new file (create directories, copy, track last copied)."""
         source_file = os.path.join(self.source_drive, new_file[0])
         destination_file = os.path.join(
             self.DRIVE_MIRROR, self.engineer_name, new_file[0]
@@ -123,6 +161,7 @@ class DriveMirror:
         self.mirrored_file = destination_file
 
     def changed_file_operations(self, changed_file):
+        """Copy an updated file overwriting mirror copy and preserve checksum if present."""
         source_file = os.path.join(self.source_drive, changed_file[0])
         destination_file = os.path.join(
             self.DRIVE_MIRROR, self.engineer_name, changed_file[0]
@@ -135,12 +174,14 @@ class DriveMirror:
             shutil.copy2(f"{source_file}.md5", f"{destination_file}.md5")
 
     def removed_file_operations(self, removed_file):
+        """Remove a file from the mirror that no longer exists in the source."""
         destination_file = os.path.join(
             self.DRIVE_MIRROR, self.engineer_name, removed_file[0]
         )
         os.remove(destination_file)
 
     def call_checksum_operations(self):
+        """Generate + verify checksum for the last mirrored file; delete if invalid."""
         self.cs.file_checksum_generate(self.mirrored_file)
         self.cs.file_checksum_verify(self.mirrored_file)
 
@@ -151,6 +192,7 @@ class DriveMirror:
             pass
 
     def commit_file_changes(self):
+        """Apply pending new/changed/removed file operations with progress + validation."""
         if self.new_files_in_source != []:
             print("\n[bold magenta]Mirroring new files...[/bold magenta]")
             for index, new_file in enumerate(self.new_files_in_source):
@@ -203,6 +245,7 @@ class DriveMirror:
             )
 
     def run_drive_mirror_operations(self):
+        """Main orchestration method to detect, review, and apply mirror changes."""
         logger.info("Drive mirror operations initiated")
 
         if self.check_mirror_location():
