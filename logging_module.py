@@ -1,3 +1,11 @@
+"""Central logging configuration.
+
+Loads environment variables (via .env) to locate ROOT_LOCATION and configures a
+module-level logger that writes INFO+ messages to a timestamped log file named
+YYYYMMDD_HH.MM_log.log inside ROOT_LOCATION. Import `logger` from this module
+where logging is required.
+"""
+
 import logging
 from datetime import datetime
 import os
