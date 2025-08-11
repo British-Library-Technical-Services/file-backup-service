@@ -1,3 +1,9 @@
+"""User-facing rich text messages and prompts for the file backup & drive mirror services.
+
+This module centralises formatted console messages (Rich markup) and small helper
+methods that return dynamic text shown during backup or mirroring workflows.
+Import and instantiate MessagingService where interactive CLI messaging is needed.
+"""
 import os
 from rich import print
 
