@@ -48,6 +48,16 @@ class BackupFileService:
         self.pbo = PostBackupOperations(self.STAGING_LOCATION)
         self.progress_bar = progress_bar
 
+    def check_remaining_storage_space(self):
+        """Check remaining storage space on backup drive"""
+        total, used, free = shutil.disk_usage(self.STAGING_LOCATION)
+        # Convert bytes to gigabytes
+        total_gb = total // (2**30)
+        used_gb = used // (2**30)
+        free_gb = free // (2**30)
+        logger.info(f"\nBackup drive storage - Total: {total_gb} GB; Used: {used_gb} GB; Free: {free_gb} GB")
+        return total_gb, used_gb, free_gb
+
     def clear_staging_area(self):
         try:
             staging_file_check = glob.glob(self.STAGING_LOCATION + "/*.*")
@@ -316,6 +326,13 @@ def main():
     except Exception as e:
         Prompt.ask(str(e))
         exit()
+
+    ### check remaining storage space in staging area
+    total_gb, used_gb, free_gb = bfs.check_remaining_storage_space()
+    print(f"Backup drive storage - Total: {total_gb} GB; Used: {used_gb} GB; Free: {free_gb} GB")
+    if free_gb < 10:  # require at least 10 GB free
+        print(f"[bold red]!! Warning: only {free_gb} GB free space available on drive !![/bold red]")
+        logger.warning(f"Only {free_gb} GB free space available on drive")
 
     ### source copy set and engineer name captured
     try:
