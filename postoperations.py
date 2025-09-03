@@ -111,6 +111,8 @@ class PostBackupOperations:
                     "-y",
                     "-i",
                     wav_file,
+                    "-movflags",
+                    "faststart",
                     "-c:a",
                     "aac",
                     "-b:a",
