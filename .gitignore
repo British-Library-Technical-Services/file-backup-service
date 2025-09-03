@@ -1,6 +1,7 @@
 **/__pycache__
 **/.venv
 *.env
+*.env.example
 *userlist.py
 *test_pad.py
 *bwfmetaedit.exe
