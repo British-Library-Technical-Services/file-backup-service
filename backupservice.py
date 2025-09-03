@@ -83,7 +83,7 @@ class BackupFileService:
         Prompt.ask(self.ms.welcome_messgage)
 
         try:
-            source_drive_select = filedialog.askdirectory(initialdir="/media/quadriga/")
+            source_drive_select = filedialog.askdirectory(initialdir="/media/soundarchive/")
         except FileNotFoundError:
             logger.warning(f"Source directory not found. Exiting.")
             raise ValueError(FileNotFoundError)
